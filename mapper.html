@@ -1,0 +1,408 @@
+<html>
+<head>
+<title>Mapper</title>
+<style>
+td.tile span{
+  position:relative;
+	top:0px;
+	left:6px;
+	margin:0px;
+	padding:0px;
+	font-size:11px;
+}
+td.tile{
+	margin:0px;
+	padding:0px;
+	border:1px solid #ffffff;
+	color: #ffffff;
+	width:20px;
+	height:20px;
+}
+td.tile:hover{
+	border:1px solid yellow;
+}
+#panel1{
+	border:1px solid #cccccc;
+	margin:20px;
+	padding:10px;
+	display:block;
+}
+#activeColorSampler{
+	margin:0px;
+	padding:15px;
+	border:1px solid black;
+	width:70px;
+	height:70px;
+}
+#colorsMenu, #newColorInput, #newYinput, #loadDialogButton, #activeColorSampler{
+	margin-right:30px;
+}
+#loadDialog, #saveDialog{
+	position:fixed;
+	top:35%;
+	left:35%;
+	border:2px outset #aaaaaa;
+	background-color: #dddddd;
+	text-align:center;
+	padding:10px;
+}
+#toggleInputModeButton{
+	margin:0px;
+	padding:10px 5px;
+	background-color:lightblue;
+}
+</style>
+<script language="Javascript">
+
+var board = new Array(1);
+board[0] = new Array(1);
+board[0][0] = 0;
+
+var boardText = new Array(1);
+boardText[0] = new Array(1);
+boardText[0][0] = "";
+
+
+var colors = new Array("000000","ffffff");
+var activeColor = 0;
+
+var inputMode = 0; // 0:coloring, 1:typing
+
+function debugBoard()
+{
+	var renderBuffer = "";
+	for (x=0; x < board.length; x++)
+	{
+		for (y=0; y < board[x].length; y++)
+		{
+			renderBuffer += board[x][y];
+		}
+		renderBuffer += "\n"
+	}
+	alert(renderBuffer);
+}
+
+function $() {
+	var elements = new Array();
+	for (var i = 0; i < arguments.length; i++) {
+		var element = arguments[i];
+		if (typeof element == 'string')
+			element = document.getElementById(element);
+		if (arguments.length == 1)
+			return element;
+		elements.push(element);
+	}
+	return elements;
+}
+
+function toggle(obj) {
+	var el = $(obj);
+	if ( el.style.display != 'none' ) {
+		el.style.display = 'none';
+	}
+	else {
+		el.style.display = '';
+	}
+}
+
+function startUp()
+{
+	toggle("loadDialog");
+	toggle("saveDialog");
+
+	$("newXinput").value = 1;
+	$("newYinput").value = 1;
+	
+	updateColorList();
+	
+	updateActiveColor();
+
+	redrawBoard();
+	
+	toggle("busy");
+}
+
+function updateColorList()
+{
+	var renderBuffer = "";
+	for (i=0; i < colors.length; i++)
+	{
+		renderBuffer += "<option value=\"" + i + "\">" + colors[i] + "</option>";
+	}
+	$("colorsMenu").innerHTML = renderBuffer;
+}
+
+function addColor(color)
+{
+	var newColorId = colors.length;
+	colors[newColorId] = color;
+	
+	updateColorList();
+	
+	$("colorsMenu").value = newColorId;
+	updateActiveColor();
+}
+
+function updateActiveColor()
+{
+	activeColor = $("colorsMenu").value;
+	$("activeColorSampler").style.backgroundColor = colors[activeColor];
+}
+
+function resizeBoard()
+{
+	var newX = $("newXinput").value;
+	var newY = $("newYinput").value;
+	
+	// colors
+	var newBoard = new Array(newX);
+	for (x=0; x<newX; x++)
+	{
+		newBoard[x] = new Array(newY);
+		for (y=0; y<newY; y++)
+		{
+			if (x >= board.length || y >= board[0].length)
+				newBoard[x][y] = 0;
+			else
+				newBoard[x][y] = board[x][y];
+		}
+	}
+	board = newBoard;
+
+	//text
+	newBoard = new Array(newX);
+	for (x=0; x<newX; x++)
+	{
+		newBoard[x] = new Array(newY);
+		for (y=0; y<newY; y++)
+		{
+			if (x >= boardText.length || y >= boardText[0].length)
+				newBoard[x][y] = "";
+			else
+				newBoard[x][y] = boardText[x][y];
+		}
+	}
+	boardText = newBoard;
+
+	redrawBoard();
+}
+
+function redrawBoard()
+{
+	//alert("redrawing");
+	var buffer = "";
+	for (x=0; x<board.length; x++)
+	{
+		//alert("x="+x);
+		buffer += "<tr>";
+		for (y=0; y<board[x].length; y++)
+		{
+			//alert("y="+y);
+			buffer += "<td class=\"tile\" id=\""+x+"."+y+"\" onClick=\"changeTile("+x+","+y+")\">";
+		}
+		buffer += "</tr>";
+	}
+	//alert(buffer);
+	$("board").innerHTML = buffer;
+
+	for (x=0; x<board.length; x++)
+	{
+		//alert("x="+x);
+		for (y=0; y<board[x].length; y++)
+		{
+			//alert("y="+y);
+			updateTile(x,y);
+		}
+		buffer += "</tr>";
+	}
+}
+
+function updateTile(x,y)
+{
+	//alert("setting ("+x+"."+y+") to "+board[x][y]);
+	$(x+"."+y).style.backgroundColor = colors[board[x][y]];
+
+	var foreground = calcForeground(colors[board[x][y]]);
+	$(x+"."+y).style.borderColor = foreground;
+	$(x+"."+y).style.color = foreground;
+
+	$(x+"."+y).innerHTML = "<span>"+boardText[x][y]+"</span>";
+}
+
+function changeTile(x,y)
+{
+	if (inputMode == 0)
+	{
+		board[x][y] = activeColor;
+	}
+	else
+	{
+		var response = prompt("Enter text for ("+x+","+y+"):", boardText[x][y]);
+		if (response != null)
+			boardText[x][y] = response;
+	}
+	updateTile(x,y);
+}
+
+// save format
+// Color_array_length;Colors|Board_XxBoard_Y;Row1:Row2:Row3(...)|txt_X,txt_Y,txt;(...)
+
+function save()
+{
+	toggle('saveDialog');
+
+	buffer = colors.length+";"+colors.join(",")+"|"+board.length+"x"+board[0].length+";";
+	for (x=0; x<board.length; x++)
+	{
+		buffer += board[x].join(",");
+		if (x < board.length - 1)
+			buffer += ":";
+	}
+	buffer += "|";
+	for (x=0; x<boardText.length; x++)
+	{
+		for (y=0; y<boardText[x].length; y++)
+		{
+			if (boardText[x][y] != "")
+			{
+				buffer += x+","+y+","+boardText[x][y]
+				if (y < boardText[x].length - 1)
+					buffer += ";";
+			}
+		}
+	}
+	while (buffer.substr(-1,1) == ";")
+		buffer = buffer.substr(0, buffer.length - 1);
+	$("saveInput").value = buffer;
+}
+
+function load()
+{
+	var loadData = $("loadInput").value;
+	loadData = loadData.split("|");
+	
+	// colors
+	loadData[0] = loadData[0].split(";");
+	colors = new Array(loadData[0][0]);
+	colors = loadData[0][1].split(",");
+	updateColorList();
+	updateActiveColor();
+	
+	var textData = loadData[2];
+
+	// board
+	loadData = loadData[1].split(";");
+
+	loadData[0] = loadData[0].split("x");
+	board = new Array(1);
+	board[0] = new Array(1);
+	board[0][0] = 0;
+	var newX = loadData[0][0];
+	var newY = loadData[0][1];
+	$("newXinput").value = newX;
+	$("newYinput").value = newY;
+	resizeBoard();
+
+	loadData = loadData[1].split(":");
+	for (x=0; x<loadData.length; x++)
+	{	
+		board[x] = loadData[x].split(",");
+	}
+	
+	// board text
+	textData = textData.split(";");
+	boardText = new Array(newX);
+	for (x=0; x < newX; x++)
+	{
+		boardText[x] = new Array(newY);
+		for (y=0; y<newY; y++)
+			boardText[x][y] = "";
+	}
+	for (i in textData)
+	{
+		textData[i] = textData[i].split(",");
+		boardText[ textData[i][0] ][ textData[i][1] ] = textData[i][2];
+	}
+
+	redrawBoard();
+
+	toggle("loadDialog");
+}
+
+function toggleInputMode()
+{
+	if (inputMode == 0)
+	{
+		inputMode = 1;
+		$("toggleInputModeButton").innerHTML = "Typing";
+		$("toggleInputModeButton").style.backgroundColor = "dddddd";
+	}
+	else
+	{
+		inputMode = 0;
+		$("toggleInputModeButton").innerHTML = "Coloring";
+		$("toggleInputModeButton").style.backgroundColor = "ccccff";
+	}
+}
+
+function calcForeground(background)
+{
+	var r = 255 - parseInt(background.substr(0,2),16);
+	var g = 255 - parseInt(background.substr(2,2),16);
+	var b = 255 - parseInt(background.substr(4,2),16);
+
+	if (r <= 15)
+		r = "0" + r.toString(16);
+	else
+		r = r.toString(16);
+	if (g <= 15)
+		g = "0" + g.toString(16);
+	else
+		g = g.toString(16);
+	if (b <= 15)
+		b = "0" + b.toString(16);
+	else
+		b = b.toString(16);
+	
+	return r+g+b;
+}
+	
+</script>
+<body onLoad="javascript:startUp()">
+
+<div id="loadDialog">
+	<textarea rows="4" cols="30" id="loadInput"></textarea><br />
+	<br />
+	<button onClick="javascript:load()">Load</button>
+</div>
+
+<div id="saveDialog">
+	<textarea rows="4" cols="30" id="saveInput"></textarea><br />
+	<br />
+	<button onClick="javascript:toggle('saveDialog')">Close</button>
+</div>
+
+<button onClick="javascript:addColor($('newColorInput').value)">Add Color</button>
+<input id="newColorInput" type="text" size="5" />
+
+<button onClick="javascript:resizeBoard()">Resize</button>
+<input id="newXinput" type="text" size="1" /> x <input id="newYinput" type="text" size="1" />
+
+<button onClick="javascript:toggle('loadDialog')" id="loadDialogButton">Load</button>
+
+<button onClick="javascript:save()" id="saveDialogButton">Save</button>
+
+
+<br />
+
+<div id="panel1">
+	Colors: <select id="colorsMenu" onChange="javascript:updateActiveColor()"></select>
+	Active Color: <span id="activeColorSampler">&nbsp;</span>
+	<button id="toggleInputModeButton" onClick="javascript:toggleInputMode()">Coloring</button>
+</div>
+
+<br />
+
+<table cellspacing="0" cellpadding="0" border="0" id="board"></table>
+</body>
+</html>
